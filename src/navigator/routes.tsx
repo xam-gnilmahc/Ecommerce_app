@@ -2,12 +2,12 @@ export const publicRoutes = [
     { 
       name: "Login", 
       component: require("../screens/Login").default,
-      options: { animation: "slide_from_bottom" } 
+      options: { animation: "slide_from_bottom" as const } 
      },
     { 
         name: "SignUp", 
         component: require("../screens/SignUp").default,
-        options: { animation: "slide_from_bottom" } 
+        options: { animation: "slide_from_bottom" as const } 
     },
   ];
   

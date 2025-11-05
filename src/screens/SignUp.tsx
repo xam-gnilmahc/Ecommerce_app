@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  SafeAreaView,
   ActivityIndicator,
   ScrollView,
   Dimensions,
@@ -16,6 +15,7 @@ import {
 import LinearGradient from "react-native-linear-gradient";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type RootStackParamList = {
   Login: undefined;
