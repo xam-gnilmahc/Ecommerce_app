@@ -1,12 +1,14 @@
 export const publicRoutes = [
     { 
       name: "Login", 
-      component: require("../screens/Login.tsx").default
+      component: require("../screens/Login").default,
+      options: { animation: "slide_from_bottom" } 
      },
-    // { 
-    //     name: "SignUp", 
-    //     component: require("../screens/SignUp").default
-    // },
+    { 
+        name: "SignUp", 
+        component: require("../screens/SignUp").default,
+        options: { animation: "slide_from_bottom" } 
+    },
   ];
   
   export const privateRoutes = [
