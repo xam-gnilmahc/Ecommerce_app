@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useContext, useRef } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Dimensions,
@@ -16,6 +15,9 @@ import LinearGradient from "react-native-linear-gradient";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { supabase } from "../utils/supbase";
+import { ResponseNotificationContext } from "../context/ResponseNotificationContext";
+import { useForm, Controller } from "react-hook-form";
 
 type RootStackParamList = {
   Login: undefined;
@@ -27,113 +29,132 @@ const { width, height } = Dimensions.get("window");
 
 export default function SignUpScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [confirmPassword, setConfirmPassword] = useState<string>("");
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
+  const { showResponse } = useContext(ResponseNotificationContext);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSignUp = () => {
+  const passwordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
+
+  const { control, handleSubmit, watch } = useForm({
+    defaultValues: { email: "", password: "", confirmPassword: "" },
+  });
+
+  const onSubmit = async (data: { email: string; password: string; confirmPassword: string }) => {
+    const { email, password, confirmPassword } = data;
+
     setLoading(true);
-
     if (!email || !password || !confirmPassword) {
       setLoading(false);
-      Alert.alert("Error", "Please fill all fields");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setLoading(false);
-      Alert.alert("Error", "Passwords do not match");
+      showResponse("Please fill all fields", "error");
       return;
     }
 
-    setTimeout(() => {
+    if (password !== confirmPassword) {
       setLoading(false);
-      Alert.alert("Success", "Account created! Please login.");
-      navigation.goBack();
-    }, 2000);
+      showResponse("Passwords do not match", "error");
+      return;
+    }
+
+    try {
+      const { data: userData, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        showResponse(error.message, "error");
+      } else {
+        showResponse("Account created!", "success");
+        navigation.navigate("Login");
+      }
+    } catch {
+      showResponse("Something went wrong. Try again.", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <LinearGradient
-      colors={["#FBC2EB", "#A18CD1"]}
-      style={styles.gradientContainer}
-    >
+    <LinearGradient colors={["#FBC2EB", "#A18CD1"]} style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={{ flex: 1 }}
-        >
-          <ScrollView
-            contentContainerStyle={{ flexGrow: 1 }}
-            showsVerticalScrollIndicator={false}
-          >
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
             <View style={styles.mainContainer}>
-              {/* Header */}
               <View style={styles.header}>
                 <Text style={styles.headerText}>Already have an account?</Text>
-                <TouchableOpacity
-                  style={styles.glassyButton}
-                  onPress={() => navigation.navigate("Login")}
-                >
+                <TouchableOpacity style={styles.glassyButton} onPress={() => navigation.navigate("Login")}>
                   <Text style={styles.glassyText}>Login</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Logo */}
               <Text style={styles.logo}>Joma</Text>
               <Text style={styles.tagline}>Sign up to start shopping</Text>
 
-              {/* Card */}
               <View style={styles.card}>
                 <Text style={styles.title}>Create Account</Text>
 
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email Address"
-                  placeholderTextColor="#aaa"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
+                <Controller
+                  control={control}
+                  name="email"
+                  rules={{ required: true }}
+                  render={({ field: { onChange, value } }) => (
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Email Address"
+                      placeholderTextColor="#aaa"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      value={value}
+                      onChangeText={onChange}
+                      returnKeyType="next"
+                      onSubmitEditing={() => passwordRef.current?.focus()}
+                    />
+                  )}
                 />
 
-                <View style={styles.passwordContainer}>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      { flex: 1, marginBottom: 0, borderWidth: 0 },
-                    ]}
-                    placeholder="Password"
-                    placeholderTextColor="#aaa"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.iconContainer}
-                  >
-                    <Ionicons
-                      name={showPassword ? "eye-off" : "eye"}
-                      size={22}
-                      color="#666"
-                    />
-                  </TouchableOpacity>
-                </View>
+                <Controller
+                  control={control}
+                  name="password"
+                  rules={{ required: true }}
+                  render={({ field: { onChange, value } }) => (
+                    <View style={styles.passwordContainer}>
+                      <TextInput
+                        ref={passwordRef}
+                        style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
+                        placeholder="Password"
+                        placeholderTextColor="#aaa"
+                        secureTextEntry={!showPassword}
+                        value={value}
+                        onChangeText={onChange}
+                        returnKeyType="next"
+                        onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                      />
+                      <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.iconContainer}>
+                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={22} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                />
 
-                <TextInput
-                  style={styles.input}
-                  placeholder="Confirm Password"
-                  placeholderTextColor="#aaa"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry
+                <Controller
+                  control={control}
+                  name="confirmPassword"
+                  rules={{ required: true }}
+                  render={({ field: { onChange, value } }) => (
+                    <TextInput
+                      ref={confirmPasswordRef}
+                      style={styles.input}
+                      placeholder="Confirm Password"
+                      placeholderTextColor="#aaa"
+                      secureTextEntry
+                      value={value}
+                      onChangeText={onChange}
+                      returnKeyType="done"
+                      onSubmitEditing={handleSubmit(onSubmit)} // Enter triggers signup
+                    />
+                  )}
                 />
 
                 <TouchableOpacity
                   style={[styles.button, loading && { opacity: 0.6 }]}
-                  onPress={handleSignUp}
+                  onPress={handleSubmit(onSubmit)}
                   disabled={loading}
                 >
                   <LinearGradient
@@ -142,11 +163,7 @@ export default function SignUpScreen() {
                     end={{ x: 1, y: 1 }}
                     style={styles.gradientButton}
                   >
-                    {loading ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.buttonText}>Sign Up</Text>
-                    )}
+                    {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign Up</Text>}
                   </LinearGradient>
                 </TouchableOpacity>
 
@@ -171,6 +188,7 @@ export default function SignUpScreen() {
     </LinearGradient>
   );
 }
+
 
 const styles = StyleSheet.create({
   gradientContainer: { flex: 1 },
