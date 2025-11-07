@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useContext, useRef} from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Dimensions,
@@ -16,48 +15,96 @@ import LinearGradient from "react-native-linear-gradient";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from "react-native-safe-area-context";
-
+import { supabase } from "../utils/supbase";
+import { ResponseNotificationContext } from "../context/ResponseNotificationContext";
+import { useForm, Controller } from "react-hook-form";
+import {
+  GoogleSignin,
+  GoogleSigninButton,
+} from '@react-native-google-signin/google-signin';
 
 const { width, height } = Dimensions.get("window");
 
 export default function Login() {
   const navigation = useNavigation();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { showResponse } = useContext(ResponseNotificationContext);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
+  const [userInfo, setUserInfo] = useState<any>(null);
 
-  const handleLogin = () => {
+  const { control, handleSubmit } = useForm({
+    defaultValues: { email: "", password: "" },
+  });
+
+  const onSubmit = async (data: { email: string; password: string }) => {
+    const { email, password } = data;
+    if (loading) return;
     setLoading(true);
 
     if (!email || !password) {
-      setLoading(false);
-      Alert.alert("Error", "Please fill all fields");
+      showResponse("Please fill all fields", "error");
       return;
     }
-    
-    setTimeout(() => {
+
+    try {
+      const { data: userData, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        showResponse(error.message, "error");
+      } else {
+        showResponse(`Welcome, ${email}!`, "success");
+      }
+    } catch (err) {
+      showResponse("Something went wrong during login", "error");
+    } finally {
       setLoading(false);
-      Alert.alert("Success", `Welcome, ${email}!`);
-    }, 2000);
+    }
   };
 
+  const loginWithGoogle = async () => {
+    if (googleLoading) return;
+    setGoogleLoading(true);
+
+    try {
+      const response: any = await GoogleSignin.signIn();
+      setUserInfo(response);
+
+      const idToken = response.data.idToken;
+      if (!idToken) {
+        showResponse("Google login failed: no ID token", "error");
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: idToken,
+      });
+
+      if (error) {
+        showResponse("Login failed: " + error.message, "error");
+        return;
+      }
+
+      showResponse(`Logged in successfully as ${data.user?.email}`, "success");
+    } catch (err: any) {
+      showResponse(err?.message || "Something went wrong", "error");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+
   return (
-    <LinearGradient
-      colors={["#A18CD1", "#FBC2EB"]}
-      style={styles.gradientContainer}
-    >
+    <LinearGradient colors={["#A18CD1", "#FBC2EB"]} style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={{ flex: 1 }}
-        >
-          <ScrollView
-            contentContainerStyle={{ flexGrow: 1 }}
-            showsVerticalScrollIndicator={false}
-          >
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
             <View style={styles.mainContainer}>
-              {/* Header */}
               <View style={styles.header}>
                 <Text style={styles.headerText}>New to Joma?</Text>
                 <TouchableOpacity style={styles.glassyButton} onPress={() => navigation.navigate('SignUp')}>
@@ -65,49 +112,59 @@ export default function Login() {
                 </TouchableOpacity>
               </View>
 
-              {/* Logo */}
               <Text style={styles.logo}>Joma</Text>
-              {/* Card */}
+
               <View style={styles.card}>
                 <Text style={styles.title}>Login to Continue</Text>
-                <Text style={styles.subtitle}>
-                  Enjoy shopping with a fresh experience
-                </Text>
+                <Text style={styles.subtitle}>Enjoy shopping with a fresh experience</Text>
 
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email Address"
-                  placeholderTextColor="#aaa"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
+                <Controller
+                  control={control}
+                  name="email"
+                  rules={{ required: true }}
+                  render={({ field: { onChange, value } }) => (
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Email Address"
+                      placeholderTextColor="#aaa"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      value={value}
+                      onChangeText={onChange}
+                      returnKeyType="next"
+                      onSubmitEditing={() => passwordRef.current?.focus()}
+                    />
+                  )}
                 />
 
-                <View style={styles.passwordContainer}>
-                  <TextInput
-                    style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
-                    placeholder="Password"
-                    placeholderTextColor="#aaa"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.iconContainer}
-                  >
-                    <Ionicons
-                      name={showPassword ? "eye-off" : "eye"}
-                      size={22}
-                      color="#666"
-                    />
-                  </TouchableOpacity>
-                </View>
+                <Controller
+                  control={control}
+                  name="password"
+                  rules={{ required: true }}
+                  render={({ field: { onChange, value } }) => (
+                    <View style={styles.passwordContainer}>
+                      <TextInput
+                        ref={passwordRef}
+                        style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
+                        placeholder="Password"
+                        placeholderTextColor="#aaa"
+                        value={value}
+                        onChangeText={onChange}
+                        secureTextEntry={!showPassword}
+                        returnKeyType="done"
+                        onSubmitEditing={handleSubmit(onSubmit)}
+                      />
+                      <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.iconContainer}>
+                        <Ionicons name={showPassword ? "eye-off" : "eye"} size={22} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                />
 
+                {/* Login Button */}
                 <TouchableOpacity
                   style={[styles.button, loading && { opacity: 0.6 }]}
-                  onPress={handleLogin}
+                  onPress={handleSubmit(onSubmit)}
                   disabled={loading}
                 >
                   <LinearGradient
@@ -116,11 +173,7 @@ export default function Login() {
                     end={{ x: 1, y: 1 }}
                     style={styles.gradientButton}
                   >
-                    {loading ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.buttonText}>Sign In</Text>
-                    )}
+                    {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign In</Text>}
                   </LinearGradient>
                 </TouchableOpacity>
 
@@ -131,12 +184,20 @@ export default function Login() {
                 <Text style={styles.or}>Or continue with</Text>
 
                 <View style={styles.socialContainer}>
-                  <TouchableOpacity style={styles.socialButton}>
+                  <TouchableOpacity
+                    style={[styles.socialButton, googleLoading && { opacity: 0.6 }]}
+                    onPress={loginWithGoogle}
+                    disabled={googleLoading}
+                  >
                     <Ionicons name="logo-google" size={20} color="#EA4335" />
                     <Text style={styles.socialText}>Google</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={styles.socialButton}>
+                  <TouchableOpacity
+                    style={[styles.socialButton, googleLoading && { opacity: 0.6 }]}
+                    onPress={loginWithGoogle}
+                    disabled={googleLoading}
+                  >
                     <Ionicons name="logo-apple" size={20} color="#000" />
                     <Text style={styles.socialText}>Apple</Text>
                   </TouchableOpacity>
@@ -149,7 +210,6 @@ export default function Login() {
     </LinearGradient>
   );
 }
-
 const styles = StyleSheet.create({
   gradientContainer: {
     flex: 1,
