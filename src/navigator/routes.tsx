@@ -2,22 +2,31 @@ export const publicRoutes = [
     { 
       name: "Login", 
       component: require("../screens/Login").default,
-      options: { animation: "slide_from_bottom" as const } 
+      options: { animation: "fade_from_bottom" as const } 
      },
     { 
         name: "SignUp", 
         component: require("../screens/SignUp").default,
-        options: { animation: "slide_from_bottom" as const } 
+        options: { animation: "fade_from_bottom" as const } 
+    },
+    { 
+      name: "ForgotPassword", 
+      component: require("../screens/ForgotPassword").default,
+      options: { animation: "fade_from_bottom" as const } 
     },
   ];
   
   export const privateRoutes = [
-    
-    // { 
-    //     name: "Tab", 
-    //     component: require("../navigators/TabNavigator").default, 
-    //     options: { animation: "slide_from_bottom" } 
-    // },
+    { 
+        name: "Tab", 
+        component: require("../navigator/TabNavigator").default, 
+        options: { animation: "fade_from_bottom" as const } 
+    },
+    { 
+        name: "Search", 
+        component: require("../screens/Search").default,
+        options: { animation: "fade_from_bottom" as const } 
+    },
     // { 
     //     name: "Details", 
     //     component: require("../screens/DetailsScreen").default, 

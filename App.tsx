@@ -2,23 +2,26 @@ import React, { useEffect } from 'react';
 import { enableScreens } from 'react-native-screens';
 import AppNavigator from './src/navigator/AppNavigator';
 import { ResponseNotificationProvider } from './src/context/ResponseNotificationContext';
+import { AuthProvider } from './src/context/AuthContext';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-
+import setting from './src/config/setting';
 // Enable react-native-screens before using NavigationContainer
 enableScreens();
 
 const App = () => {
   useEffect(() => {
     GoogleSignin.configure({
-      webClientId: '35204294253-5fl8ju7771alpqa3kkd1nf9u9h7tv8p0.apps.googleusercontent.com',
+      webClientId: setting.WEB_CLIENT_ID,
       offlineAccess: false,
     });
   }, []);
 
   return (
-    <ResponseNotificationProvider>
-      <AppNavigator />
-    </ResponseNotificationProvider>
+    <AuthProvider>
+      <ResponseNotificationProvider>
+        <AppNavigator />
+      </ResponseNotificationProvider>
+    </AuthProvider>
   );
 };
 

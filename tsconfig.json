@@ -9,6 +9,6 @@
     "moduleResolution": "node",
     "skipLibCheck": true
   },
-  "include": ["**/*.ts", "**/*.tsx", "src/screens/Login.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", "src/screens/Login.tsx", "src/config/setting.js"],
   "exclude": ["node_modules", "Pods"]
 }
