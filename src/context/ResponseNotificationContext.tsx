@@ -1,9 +1,16 @@
 import React, { createContext, useState, ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+  Platform,
+} from 'react-native';
 import * as Animatable from 'react-native-animatable';
 import LinearGradient from 'react-native-linear-gradient';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { COLORS, FONTSIZE, SPACING } from '../theme/theme';
+import { BlurView } from '@react-native-community/blur';
 
 const { width } = Dimensions.get('window');
 
@@ -32,7 +39,7 @@ export const ResponseNotificationProvider = ({
 
   const showResponse = (message: string, type: NotificationType = 'success') => {
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 2000);
+    setTimeout(() => setNotification(null), 2500);
   };
 
   return (
@@ -43,16 +50,27 @@ export const ResponseNotificationProvider = ({
         <Animatable.View
           animation="fadeInDown"
           duration={400}
+          easing="ease-out-cubic"
           style={styles.container}
         >
           <LinearGradient
             colors={
               notification.type === 'success'
-                ? ['#D1FADF', '#A3E4B8'] 
-                : ['#FADBD8', '#F5B7B1']
+                ? ['#D7F8E4', '#B2F0CC', '#7EE0A0']
+                : ['#FFE1E1', '#FFC1C1', '#FF9F9F']
             }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.toast}
           >
+            {Platform.OS === 'ios' && (
+              <BlurView
+                style={StyleSheet.absoluteFill}
+                blurType="light"
+                blurAmount={20}
+              />
+            )}
+
             <View style={styles.messageContainer}>
               <Ionicons
                 name={
@@ -60,20 +78,16 @@ export const ResponseNotificationProvider = ({
                     ? 'checkmark-circle'
                     : 'close-circle'
                 }
-                size={FONTSIZE.size_24}
-                color={
-                  notification.type === 'success' ? '#0F5132' : '#842029'
-                }
-                style={{ marginRight: SPACING.space_10 }}
+                size={24}
+                color={notification.type === 'success' ? '#116C3D' : '#A30000'}
+                style={styles.icon}
               />
               <Text
                 style={[
                   styles.toastText,
                   {
                     color:
-                      notification.type === 'success'
-                        ? '#0F5132'
-                        : '#7B241C',
+                      notification.type === 'success' ? '#0B3D23' : '#6E0000',
                   },
                 ]}
               >
@@ -87,9 +101,9 @@ export const ResponseNotificationProvider = ({
             >
               <Ionicons
                 name="close"
-                size={FONTSIZE.size_18}
+                size={20}
                 color={
-                  notification.type === 'success' ? '#0F5132' : '#842029'
+                  notification.type === 'success' ? '#0B3D23' : '#6E0000'
                 }
               />
             </TouchableOpacity>
@@ -103,26 +117,27 @@ export const ResponseNotificationProvider = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: 0,
+    right: 0,
     zIndex: 9999,
     alignItems: 'center',
   },
   toast: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     width: width * 0.9,
-    maxWidth: 350,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 18,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+    backgroundColor: 'rgba(255,255,255,0.25)',
   },
   messageContainer: {
     flexDirection: 'row',
@@ -130,12 +145,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   toastText: {
-    fontSize: FONTSIZE.size_16,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
     flexShrink: 1,
   },
+  icon: {
+    marginRight: 10,
+  },
   closeButton: {
+    marginLeft: 10,
     padding: 5,
-    marginLeft: SPACING.space_10,
   },
 });

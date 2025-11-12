@@ -20,7 +20,6 @@ import { ResponseNotificationContext } from "../context/ResponseNotificationCont
 import { useForm, Controller } from "react-hook-form";
 import {
   GoogleSignin,
-  GoogleSigninButton,
 } from '@react-native-google-signin/google-signin';
 
 const { width, height } = Dimensions.get("window");
@@ -71,12 +70,14 @@ export default function Login() {
     setGoogleLoading(true);
 
     try {
+
+      await GoogleSignin.signOut();
       const response: any = await GoogleSignin.signIn();
       setUserInfo(response);
 
       const idToken = response.data.idToken;
       if (!idToken) {
-        showResponse("Google login failed: no ID token", "error");
+        showResponse("Google login failed", "error");
         return;
       }
 
@@ -92,7 +93,7 @@ export default function Login() {
 
       showResponse(`Logged in successfully as ${data.user?.email}`, "success");
     } catch (err: any) {
-      showResponse(err?.message || "Something went wrong", "error");
+      showResponse("Something went wrong", "error");
     } finally {
       setGoogleLoading(false);
     }
@@ -100,7 +101,11 @@ export default function Login() {
 
 
   return (
-    <LinearGradient colors={["#A18CD1", "#FBC2EB"]} style={styles.gradientContainer}>
+    <View style={styles.container}>
+    <LinearGradient colors={["#A18CD1", "#FBC2EB"]} 
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.gradientBackground}>
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
@@ -177,7 +182,7 @@ export default function Login() {
                   </LinearGradient>
                 </TouchableOpacity>
 
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
                   <Text style={styles.forgot}>Forgot your password?</Text>
                 </TouchableOpacity>
 
@@ -198,8 +203,8 @@ export default function Login() {
                     onPress={loginWithGoogle}
                     disabled={googleLoading}
                   >
-                    <Ionicons name="logo-apple" size={20} color="#000" />
-                    <Text style={styles.socialText}>Apple</Text>
+                    <Ionicons name="logo-facebook" size={20} color="#000000ff" />
+                    <Text style={styles.socialText}>Facebook</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -208,14 +213,27 @@ export default function Login() {
         </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
+    </View>
   );
 }
 const styles = StyleSheet.create({
-  gradientContainer: {
+  container: {
     flex: 1,
+    position: "relative",
+    backgroundColor: "#A18CD1", // fallback in case gradient fails
+  },
+   gradientBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100%",
+    height: "100%",
   },
   safeArea: {
     flex: 1,
+    backgroundColor: "transparent",
   },
   mainContainer: {
     flex: 1,

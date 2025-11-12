@@ -18,6 +18,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { supabase } from "../utils/supbase";
 import { ResponseNotificationContext } from "../context/ResponseNotificationContext";
 import { useForm, Controller } from "react-hook-form";
+import {
+  GoogleSignin,
+} from '@react-native-google-signin/google-signin';
 
 type RootStackParamList = {
   Login: undefined;
@@ -32,6 +35,7 @@ export default function SignUpScreen() {
   const { showResponse } = useContext(ResponseNotificationContext);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const passwordRef = useRef<TextInput>(null);
   const confirmPasswordRef = useRef<TextInput>(null);
@@ -57,7 +61,7 @@ export default function SignUpScreen() {
     }
 
     try {
-      const { data: userData, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) {
         showResponse(error.message, "error");
       } else {
@@ -70,6 +74,40 @@ export default function SignUpScreen() {
       setLoading(false);
     }
   };
+
+
+  const loginWithGoogle = async () => {
+      if (googleLoading) return;
+      setGoogleLoading(true);
+  
+      try {
+  
+        await GoogleSignin.signOut();
+        const response: any = await GoogleSignin.signIn();
+  
+        const idToken = response.data.idToken;
+        if (!idToken) {
+          showResponse("Google login failed", "error");
+          return;
+        }
+  
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: "google",
+          token: idToken,
+        });
+  
+        if (error) {
+          showResponse("Login failed: " + error.message, "error");
+          return;
+        }
+  
+        showResponse(`Logged in successfully as ${data.user?.email}`, "success");
+      } catch (err: any) {
+        showResponse("Something went wrong", "error");
+      } finally {
+        setGoogleLoading(false);
+      }
+    };
 
   return (
     <LinearGradient colors={["#FBC2EB", "#A18CD1"]} style={styles.gradientContainer}>
@@ -170,12 +208,12 @@ export default function SignUpScreen() {
                 <Text style={styles.or}>Or sign up with</Text>
 
                 <View style={styles.socialContainer}>
-                  <TouchableOpacity style={styles.socialButton}>
+                  <TouchableOpacity style={styles.socialButton}  onPress={loginWithGoogle}>
                     <Ionicons name="logo-google" size={20} color="#EA4335" />
                     <Text style={styles.socialText}>Google</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={styles.socialButton}>
+                  <TouchableOpacity style={styles.socialButton}  onPress={loginWithGoogle}>
                     <Ionicons name="logo-apple" size={20} color="#000" />
                     <Text style={styles.socialText}>Apple</Text>
                   </TouchableOpacity>
