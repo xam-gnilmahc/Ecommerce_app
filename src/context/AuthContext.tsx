@@ -42,6 +42,7 @@ type AuthContextType = {
   loading: boolean;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   fetchProducts: () => Promise<Product[]>;
+  fetchProductDetail: () => Promise<any>;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -49,6 +50,7 @@ export const AuthContext = createContext<AuthContextType>({
   loading: true,
   setUser: () => {},
   fetchProducts: async () => [],
+  fetchProductDetail: async () => [],
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -156,28 +158,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   // fetchProducts now accepts a brand
-  const fetchProducts = async (brand?: string): Promise<Product[]> => {
-      let query = supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true);
+  const fetchProducts = async (brand?:string, from = 0, to = 20) => {
+    let query = supabase
+      .from("products")
+      .select("*")
+      .eq("is_active", true);
 
-      if (brand) {
-        query = query.in("brand", [brand]);
-      }
+    if (brand) {
+      query = query.in("brand", [brand]);
+    }
 
-      const { data, error } = await query.range(0, 20);
+    const { data, error } = await query.range(from, to);
 
-      if (error) {
-          console.error('Error fetching products:', error.message);
-          return [];
-      }
+    if (error) {
+      console.error("Error fetching products:", error.message);
+      return [];
+    }
 
-      return data;
+    return data;
+  };
+
+  const fetchProductDetail = async (id: number) => {
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) throw error;
+    return data;
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, setUser, fetchProducts }}>
+    <AuthContext.Provider value={{ user, loading, setUser, fetchProducts, fetchProductDetail }}>
       {children}
     </AuthContext.Provider>
   );

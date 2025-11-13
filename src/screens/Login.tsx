@@ -10,6 +10,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -102,6 +103,7 @@ export default function Login() {
 
   return (
     <View style={styles.container}>
+    <StatusBar barStyle="dark-content" backgroundColor="#A18CD1" />
     <LinearGradient colors={["#A18CD1", "#FBC2EB"]} 
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}

@@ -17,7 +17,7 @@ export const publicRoutes = [
   ];
   
   export const privateRoutes = [
-    { 
+     { 
         name: "Tab", 
         component: require("../navigator/TabNavigator").default, 
         options: { animation: "fade_from_bottom" as const } 
@@ -27,13 +27,16 @@ export const publicRoutes = [
         component: require("../screens/Search").default,
         options: { animation: "fade_from_bottom" as const } 
     },
-    // { 
-    //     name: "Details", 
-    //     component: require("../screens/DetailsScreen").default, 
-    //     options: { 
-    //         animation: "slide_from_bottom"
-    //      } 
-    // },
+    { 
+        name: "ProductDetail", 
+        component: require("../screens/ProductDetail").default, 
+         options: {
+          presentation: "card", 
+          animation: "fade_from_bottom", 
+          gestureEnabled: true,
+          headerShown: false,
+        },
+    },
     // { 
     //     name: "Payment", 
     //     component: require("../screens/PaymentScreen").default, 

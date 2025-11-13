@@ -1,14 +1,15 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, Dimensions } from "react-native";
+import { View, Text, Image, StyleSheet, Dimensions ,TouchableOpacity} from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { COLORS, FONTSIZE, SPACING } from "../theme/theme";
+import { useNavigation } from "@react-navigation/native";
 
 type ProductCardProps = {
   name: string;
   description?: string;
   banner_url?: string;
   rating?: number;
-  type?: string;
+  id?: number;
   amount?: number;
 };
 
@@ -24,12 +25,18 @@ const ProductCard = ({
   description,
   banner_url,
   rating,
-  type,
+  id,
   amount,
 }: ProductCardProps) => {
+  const navigation = useNavigation();
   const imageUri = banner_url ? `${STORAGE_BASE_URL}${banner_url}` : undefined;
 
   return (
+     <TouchableOpacity
+      key={id} 
+      activeOpacity={0.8}
+      onPress={() => navigation.navigate("ProductDetail", { id })} 
+    >
     <View style={[styles.cardContainer, { marginBottom:60 }]}>
        <View style={styles.imageWrapper}>
         {imageUri && (
@@ -65,6 +72,7 @@ const ProductCard = ({
         </View>
       </View>
     </View>
+    </TouchableOpacity>
   );
 };
 

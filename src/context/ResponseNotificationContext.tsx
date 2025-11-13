@@ -117,7 +117,7 @@ export const ResponseNotificationProvider = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
+    top: Platform.OS === 'ios' ? 60 : 20,
     left: 0,
     right: 0,
     zIndex: 9999,
