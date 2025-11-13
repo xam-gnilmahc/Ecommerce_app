@@ -10,6 +10,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from "react-native";
 import LinearGradient from "react-native-linear-gradient";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -110,6 +111,8 @@ export default function SignUpScreen() {
     };
 
   return (
+    <>
+    <StatusBar barStyle="dark-content" backgroundColor="#FBC2EB" />
     <LinearGradient colors={["#FBC2EB", "#A18CD1"]} style={styles.gradientContainer}>
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
@@ -224,6 +227,7 @@ export default function SignUpScreen() {
         </KeyboardAvoidingView>
       </SafeAreaView>
     </LinearGradient>
+    </>
   );
 }
 

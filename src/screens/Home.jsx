@@ -1,51 +1,75 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useCallback } from "react";
 import {
   View,
   TextInput,
   Text,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   FlatList,
   Platform,
   StatusBar,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
-import LottieView from "lottie-react-native";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import { COLORS, SPACING, FONTSIZE } from "../theme/theme";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import ProductCard from "../components/ProductCard";
-import {supabase} from "../utils/supbase";
+import { supabase } from "../utils/supbase";
 
 const { width } = Dimensions.get("window");
 
-const BRANDS = ["Apple", "Samsung", "Nothing", "Sony", "Nikon", "Google", "Acer", "Dell"];
+const BRANDS = ["Apple", "Samsung", "Nothing", "Sony", "Huawei", "Google", "Redmi", "Vivo"];
 
 const Home = () => {
   const { fetchProducts } = useContext(AuthContext);
   const [products, setProducts] = useState([]);
   const [productLoading, setProductLoading] = useState(true);
   const [selectedBrand, setSelectedBrand] = useState("Apple");
+  const [page, setPage] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const navigation = useNavigation();
 
-  useEffect(() => {
-    const loadProducts = async () => {
+  const ITEMS_PER_PAGE = 20;
+
+  const loadProducts = async (pageToLoad, reset = false) => {
+    if (reset) {
       setProductLoading(true);
-      try {
-        const data = await fetchProducts(selectedBrand);
+    } else {
+      setLoadingMore(true);
+    }
+    const from = pageToLoad * ITEMS_PER_PAGE;
+    const to = from + ITEMS_PER_PAGE - 1;
+
+    try {
+      const data = await fetchProducts(selectedBrand, from, to);
+      if (reset) {
         setProducts(data || []);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-      } finally {
-        setProductLoading(false);
+      } else {
+        setProducts((prev) => [...prev, ...(data || [])]);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    } finally {
+      setProductLoading(false);
+      setLoadingMore(false);
+    }
+  };
 
-    loadProducts();
-  }, [fetchProducts, selectedBrand]);
 
+  useEffect(() => {
+    setPage(0);
+    loadProducts(0, true);
+  }, [selectedBrand]);
+
+  const handleLoadMore = () => {
+    if (!loadingMore && products.length >= (page + 1) * ITEMS_PER_PAGE) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadProducts(nextPage);
+    }
+  };
 
   const logout = async () => {
     try {
@@ -56,10 +80,10 @@ const Home = () => {
     }
   };
 
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+
       <View style={styles.headerContainer}>
         <View style={styles.searchRow}>
           <TouchableOpacity
@@ -77,15 +101,11 @@ const Home = () => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={() => {
-              logout();
-            }}
-          >
+          <TouchableOpacity style={styles.logoutButton} onPress={logout}>
             <Ionicons name="log-out-outline" size={22} color="#333" />
           </TouchableOpacity>
         </View>
+
         <FlatList
           data={BRANDS}
           horizontal
@@ -111,51 +131,46 @@ const Home = () => {
           )}
         />
       </View>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.productList}
-      >
-        {productLoading ? (
-          <>
-            {[1, 2, 3].map((_, index) => (
-              <View key={index} style={styles.skeletonCard}>
-                <View style={styles.skeletonImage} />
-                <View style={styles.skeletonTextLine} />
-                <View style={[styles.skeletonTextLine, { width: "70%" }]} />
-              </View>
-            ))}
-          </>
-        ) : products.length === 0 ? (
-          <Text style={styles.emptyText}>No products available.</Text>
-        ) : (
-          products.map((product) => (
+
+      {productLoading ? (
+        <>
+          {[1, 2, 3].map((_, index) => (
+            <View key={index} style={styles.skeletonCard}>
+              <View style={styles.skeletonImage} />
+              <View style={styles.skeletonTextLine} />
+              <View style={[styles.skeletonTextLine, { width: "70%" }]} />
+            </View>
+          ))}
+        </>
+      ) : (
+        <FlatList
+          data={products}
+          renderItem={({ item }) => (
             <ProductCard
-              key={product.id}
-              name={product.name}
-              description={product.description}
-              banner_url={product.banner_url}
-              rating={product.rating}
-              amount={product.amount}
+              id={item.id}
+              name={item.name}
+              description={item.description}
+              banner_url={item.banner_url}
+              rating={item.rating}
+              amount={item.amount}
             />
-          ))
-        )}
-      </ScrollView>
+          )}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loadingMore ? <ActivityIndicator size="small" color="#967EDAFF" /> : null
+          }
+          contentContainerStyle={styles.productList}
+        />
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.primaryWhiteHex,
-  },
-  headerContainer: {
-    backgroundColor: "#fff",
-    paddingHorizontal: SPACING.space_12,
-    paddingTop: Platform.OS === "ios" ? 60 : StatusBar.currentHeight + 25,
-    paddingBottom: SPACING.space_10,
-    borderBottomColor: "#f0f0f0",
-    borderBottomWidth: 1,
+  container: {flex: 1,backgroundColor: COLORS.primaryWhiteHex},
+  headerContainer: {backgroundColor: "#fff",paddingHorizontal: SPACING.space_12,paddingTop: Platform.OS === "ios" ? 60 : StatusBar.currentHeight,paddingBottom: SPACING.space_10,borderBottomColor: "#f0f0f0",borderBottomWidth: 1,
   },
   searchRow: {
     flexDirection: "row",
