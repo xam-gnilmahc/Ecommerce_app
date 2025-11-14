@@ -6,6 +6,7 @@ import { COLORS } from '../theme/theme';
 import {BlurView} from '@react-native-community/blur';
 
 import HomeScreen from '../screens/Home';
+import CartScreen from '../screens/Cart';
 
 const Tab = createBottomTabNavigator();
 
@@ -44,7 +45,7 @@ const TabNavigator = () => {
 
       <Tab.Screen
         name="Cart"
-        component={HomeScreen}
+        component={CartScreen}
         options={{
           tabBarIcon: ({ focused }) => (
             <Ionicons

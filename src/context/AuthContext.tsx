@@ -43,6 +43,7 @@ type AuthContextType = {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   fetchProducts: () => Promise<Product[]>;
   fetchProductDetail: () => Promise<any>;
+  fetchCart: () => Promise<any>;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -51,6 +52,7 @@ export const AuthContext = createContext<AuthContextType>({
   setUser: () => {},
   fetchProducts: async () => [],
   fetchProductDetail: async () => [],
+  fetchCart: async () => [],
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -189,8 +191,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return data;
   };
 
+  const fetchCart = async() => {
+    if (!user) return [];
+
+    // Fetch cart items for the logged-in user
+    const { data, error } = await supabase
+        .from("cart")
+        .select(
+          `*, products:product_id (
+          id,
+          name,
+          banner_url,
+          amount,
+          description,
+          rating
+        )`
+        )
+        .eq("user_id", user.id)
+        .order("id", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching cart:", error.message);
+      return [];
+    }
+
+    return data;
+  };
+
+
   return (
-    <AuthContext.Provider value={{ user, loading, setUser, fetchProducts, fetchProductDetail }}>
+    <AuthContext.Provider value={{ user, loading, setUser, fetchProducts, fetchProductDetail , fetchCart}}>
       {children}
     </AuthContext.Provider>
   );

@@ -37,7 +37,7 @@ const ProductCard = ({
       activeOpacity={0.8}
       onPress={() => navigation.navigate("ProductDetail", { id })} 
     >
-    <View style={[styles.cardContainer, { marginBottom:60 }]}>
+    <View style={[styles.cardContainer, { marginBottom:30 }]}>
        <View style={styles.imageWrapper}>
         {imageUri && (
           <Image
