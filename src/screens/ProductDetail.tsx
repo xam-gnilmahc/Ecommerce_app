@@ -64,31 +64,6 @@ const ProductDetail = () => {
     outputRange: [0.3, 1, 0.3],
   });
 
-  if (loading) {
-    return (
-      <View style={styles.wrapper}>
-        <Animated.View style={[styles.imageSkeleton, { opacity: shimmerOpacity }]} />
-        <View style={styles.skeletonContent}>
-          <Animated.View style={[styles.skeletonTextLarge, { opacity: shimmerOpacity }]} />
-          <Animated.View style={[styles.skeletonTextMedium, { opacity: shimmerOpacity }]} />
-          <Animated.View style={[styles.skeletonTextSmall, { opacity: shimmerOpacity }]} />
-        </View>
-      </View>
-    );
-  }
-
-  if (!product) {
-    return (
-      <View style={styles.wrapper}>
-        <Text style={styles.errorText}>Product not found.</Text>
-      </View>
-    );
-  }
-
-  const imageUri = product.banner_url?.startsWith("http")
-    ? product.banner_url
-    : `${STORAGE_BASE_URL}${product.banner_url}`;
-
   return (
     <View style={styles.wrapper}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" translucent />
@@ -107,24 +82,45 @@ const ProductDetail = () => {
         </View>
       </View>
 
-      <View style={styles.imageContainer}>
-        <Image source={{ uri: imageUri }} style={styles.image} />
-      </View>
+      {/* Content */}
+      {loading ? (
+        <View style={{ flex: 1 }}>
+          <Animated.View style={[styles.imageSkeleton, { opacity: shimmerOpacity }]} />
+          <View style={styles.skeletonContent}>
+            <Animated.View style={[styles.skeletonTextLarge, { opacity: shimmerOpacity }]} />
+            <Animated.View style={[styles.skeletonTextMedium, { opacity: shimmerOpacity }]} />
+            <Animated.View style={[styles.skeletonTextSmall, { opacity: shimmerOpacity }]} />
+          </View>
+        </View>
+      ) : !product ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text style={styles.errorText}>Product not found.</Text>
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.imageContainer}>
+            <Image
+              source={{
+                uri: product.banner_url?.startsWith("http")
+                  ? product.banner_url
+                  : `${STORAGE_BASE_URL}${product.banner_url}`,
+              }}
+              style={styles.image}
+            />
+          </View>
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.divider} />
+          <View style={styles.divider} />
+          <Text style={styles.productTitle}>{product.name}</Text>
+          <Text style={styles.productSub}>{product.brand || "—"}</Text>
+          <Text style={styles.productPrice}>${product.amount?.toFixed(2)}</Text>
 
-        <Text style={styles.productTitle}>{product.name}</Text>
-        <Text style={styles.productSub}>{product.brand || "—"}</Text>
-
-        <Text style={styles.productPrice}>${product.amount?.toFixed(2)}</Text>
-
-        {product.description && (
-          <Text style={styles.warningText}>
-            ⚠️ <Text style={styles.warningBold}>WARNING:</Text> {product.description}
-          </Text>
-        )}
-      </ScrollView>
+          {product.description && (
+            <Text style={styles.warningText}>
+              ⚠️ <Text style={styles.warningBold}>WARNING:</Text> {product.description}
+            </Text>
+          )}
+        </ScrollView>
+      )}
 
       <View style={styles.bottomButtonContainer}>
         <TouchableOpacity style={styles.addButton}>
@@ -169,31 +165,33 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     marginTop: 10,
     marginBottom: 15,
-  },
-  scroll: {
-    paddingHorizontal: 20,
+    marginHorizontal:20,
   },
   productTitle: {
     fontSize: 20,
     fontWeight: "700",
     color: "#000",
+    paddingHorizontal:20,
   },
   productSub: {
     color: "#555",
     fontSize: 14,
     marginTop: 2,
+    paddingHorizontal:20,
   },
   productPrice: {
     fontSize: 22,
     fontWeight: "700",
     color: "#000",
     marginTop: 10,
+    paddingHorizontal:20,
   },
   warningText: {
     marginTop: 15,
     fontSize: 14,
     color: "#333",
     lineHeight: 20,
+    paddingHorizontal:20,
   },
   warningBold: {
     fontWeight: "700",
