@@ -16,6 +16,7 @@
     "@react-native/new-app-screen": "0.81.1",
     "@react-navigation/bottom-tabs": "^7.8.4",
     "@react-navigation/native-stack": "^7.6.2",
+    "@stripe/stripe-react-native": "^0.57.0",
     "@supabase/supabase-js": "^2.79.0",
     "jwt-decode": "^3.1.2",
     "lottie-ios": "^3.2.3",

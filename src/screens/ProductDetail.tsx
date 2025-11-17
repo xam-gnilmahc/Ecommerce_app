@@ -14,10 +14,10 @@ import {
 import { useNavigation, useRoute } from "@react-navigation/native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { AuthContext } from "../context/AuthContext";
+import { ResponseNotificationContext } from "../context/ResponseNotificationContext";
 
 const STORAGE_BASE_URL =
   "https://fzliiwigydluhgbuvnmr.supabase.co/storage/v1/object/public/productimages/";
-
 
 type ProductDetailRouteProp = {
   params: {
@@ -30,9 +30,12 @@ const ProductDetail = () => {
   const route = useRoute() as ProductDetailRouteProp;
   const navigation = useNavigation();
   const { id } = route.params;
-  const { fetchProductDetail } = useContext(AuthContext);
+  const { fetchProductDetail, addToCart } = useContext(AuthContext);
+  const { showResponse } = useContext(ResponseNotificationContext);
+
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [buttonLoading, setButtonLoading] = useState(false);
 
   const animatedValue = new Animated.Value(0);
   useEffect(() => {
@@ -51,7 +54,7 @@ const ProductDetail = () => {
         const data = await fetchProductDetail(id);
         setProduct(data);
       } catch (error) {
-        console.error("Error loading product detail:", error);
+        showResponse("Error loading product details", "error");
       } finally {
         setLoading(false);
       }
@@ -63,6 +66,23 @@ const ProductDetail = () => {
     inputRange: [0, 0.5, 1],
     outputRange: [0.3, 1, 0.3],
   });
+
+  const handleAddToCart = async () => {
+    if (!product) return;
+    setButtonLoading(true); // disable button immediately
+    try {
+      const result = await addToCart(product.id);
+      if (result.success) {
+        showResponse(result.message, "success");
+      } else {
+        showResponse(result.message, "error");
+      }
+    } catch (err) {
+      showResponse("Something went wrong", "error");
+    } finally {
+      setButtonLoading(false); // re-enable button after request
+    }
+  };
 
   return (
     <View style={styles.wrapper}>
@@ -82,7 +102,6 @@ const ProductDetail = () => {
         </View>
       </View>
 
-      {/* Content */}
       {loading ? (
         <View style={{ flex: 1 }}>
           <Animated.View style={[styles.imageSkeleton, { opacity: shimmerOpacity }]} />
@@ -123,8 +142,17 @@ const ProductDetail = () => {
       )}
 
       <View style={styles.bottomButtonContainer}>
-        <TouchableOpacity style={styles.addButton}>
-          <Text style={styles.addButtonText}>Add to bag</Text>
+        <TouchableOpacity
+          style={[
+            styles.addButton,
+            buttonLoading && { opacity: 0.6 }, 
+          ]}
+          onPress={handleAddToCart}
+          disabled={buttonLoading}
+        >
+          <Text style={styles.addButtonText}>
+            {buttonLoading ? "Adding..." : "Add to bag"}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

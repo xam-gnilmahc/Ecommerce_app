@@ -81,8 +81,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderRadius: 12,
     overflow: "hidden",
-    marginVertical: SPACING.space_8,
-    marginHorizontal: CARD_MARGIN,
     width: CARD_WIDTH,
   },
   imageWrapper: {

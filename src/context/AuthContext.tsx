@@ -42,8 +42,11 @@ type AuthContextType = {
   loading: boolean;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   fetchProducts: () => Promise<Product[]>;
-  fetchProductDetail: () => Promise<any>;
+  fetchProductDetail: (id: number) => Promise<Product | null>;
   fetchCart: () => Promise<any>;
+  addToCart: (productId: number) => Promise<{ success: boolean; message: string }>;
+  addToCartQuantity: (productId: number, quantityChange: number) => Promise<{ success: boolean; message: string }>;
+  deleteFromCart: (cartId: number) => Promise<{ success: boolean; message: string }>;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -51,8 +54,12 @@ export const AuthContext = createContext<AuthContextType>({
   loading: true,
   setUser: () => {},
   fetchProducts: async () => [],
-  fetchProductDetail: async () => [],
+  fetchProductDetail: async () => null,
   fetchCart: async () => [],
+  addToCart: async () => ({ success: false, message: "Not implemented" }),
+  addToCartQuantity: async () => ({ success: false, message: "Not implemented" }),
+  deleteFromCart: async () => ({ success: false, message: "Not implemented" }),
+  
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -191,7 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return data;
   };
 
-  const fetchCart = async() => {
+  const fetchCart = async (): Promise<any[]> => {
     if (!user) return [];
 
     // Fetch cart items for the logged-in user
@@ -208,7 +215,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         )`
         )
         .eq("user_id", user.id)
-        .order("id", { ascending: true });
+        .order("id", { ascending: false });
 
     if (error) {
       console.error("Error fetching cart:", error.message);
@@ -218,9 +225,113 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return data;
   };
 
+  const addToCart = async (productId: number): Promise<{ success: boolean; message: string }> => {
+    if (!user) return { success: false, message: "User not logged in" };
+
+    const { data: existingItem, error: selectError } = await supabase
+      .from("cart")
+      .select("id, quantity")
+      .eq("user_id", user.id)
+      .eq("product_id", productId)
+      .single();
+
+    if (selectError && selectError.code !== "PGRST116") {
+      return { success: false, message: selectError.message || "Error checking cart item" };
+    }
+
+    if (!existingItem) {
+      const { data: productData, error: productError } = await supabase
+        .from("products")
+        .select("amount")
+        .eq("id", productId)
+        .single();
+
+      if (productError) {
+        return { success: false, message: productError.message || "Error fetching product details" };
+      }
+
+      const { error: insertError } = await supabase.from("cart").insert([
+        {
+          product_id: productId,
+          user_id: user.id,
+          amount: productData?.amount ?? 0,
+          quantity: 1,
+        },
+      ]);
+
+      if (insertError) {
+        return { success: false, message: insertError.message || "Error adding product to cart" };
+      }
+
+      return { success: true, message: "Product added to cart" };
+    } else {
+      const { error: updateError } = await supabase
+        .from("cart")
+        .update({ quantity: existingItem.quantity + 1 })
+        .eq("id", existingItem.id);
+
+      if (updateError) {
+        return { success: false, message: updateError.message || "Error updating cart quantity" };
+      }
+
+      return { success: true, message: "Product quantity updated in cart" };
+    }
+  };
+
+  const addToCartQuantity = async (productId: number, quantityChange: number) => {
+    if (!user) return { success: false, message: "User not logged in" };
+
+    try {
+      // Fetch existing cart item
+      const { data: existingItem, error: selectError } = await supabase
+        .from("cart")
+        .select("id, quantity")
+        .eq("user_id", user.id)
+        .eq("product_id", productId)
+        .single();
+
+      if (selectError && selectError.code !== "PGRST116") {
+        return { success: false, message: selectError.message };
+      }
+
+      if (!existingItem) {
+        return { success: false, message: "Item not found in cart" };
+      }
+
+      const newQuantity = existingItem.quantity + quantityChange;
+      if (newQuantity < 1) return { success: false, message: "Quantity cannot be less than 1" };
+
+      const { error: updateError } = await supabase
+        .from("cart")
+        .update({ quantity: newQuantity })
+        .eq("id", existingItem.id);
+
+      if (updateError) return { success: false, message: updateError.message };
+
+      return { success: true, message: "Cart updated" };
+    } catch (err: any) {
+      return { success: false, message: err?.message || "Failed to update cart" };
+    }
+  };
+
+  const deleteFromCart = async (cartId: number) => {
+    if (!user) return { success: false, message: "User not logged in" };
+
+    try {
+      const { error } = await supabase.from("cart").delete().eq("id", cartId);
+
+      if (error) return { success: false, message: error.message };
+      return { success: true, message: "Item removed from cart" };
+    } catch (err: any) {
+      return { success: false, message: err?.message || "Failed to remove item" };
+    }
+  };
+
+
+
 
   return (
-    <AuthContext.Provider value={{ user, loading, setUser, fetchProducts, fetchProductDetail , fetchCart}}>
+    <AuthContext.Provider value={{ user, loading, setUser, fetchProducts, fetchProductDetail , fetchCart, addToCart, addToCartQuantity, deleteFromCart}}>
       {children}
     </AuthContext.Provider>
   );

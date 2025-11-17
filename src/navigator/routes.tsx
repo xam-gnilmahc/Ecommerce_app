@@ -37,6 +37,11 @@ export const publicRoutes = [
           headerShown: false,
         },
     },
+     { 
+        name: "Checkout", 
+        component: require("../screens/Checkout").default,
+        options: { animation: "fade_from_bottom" as const } 
+    },
     // { 
     //     name: "Payment", 
     //     component: require("../screens/PaymentScreen").default, 
