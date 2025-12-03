@@ -42,11 +42,12 @@ type AuthContextType = {
   loading: boolean;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   fetchProducts: () => Promise<Product[]>;
-  fetchProductDetail: (id: number) => Promise<Product | null>;
+  fetchProductDetail: (id: number) => Promise<any>;
   fetchCart: () => Promise<any>;
   addToCart: (productId: number) => Promise<{ success: boolean; message: string }>;
   addToCartQuantity: (productId: number, quantityChange: number) => Promise<{ success: boolean; message: string }>;
   deleteFromCart: (cartId: number) => Promise<{ success: boolean; message: string }>;
+  fetchNotifications: (from?: number, to?: number) => Promise<any>;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -59,13 +60,12 @@ export const AuthContext = createContext<AuthContextType>({
   addToCart: async () => ({ success: false, message: "Not implemented" }),
   addToCartQuantity: async () => ({ success: false, message: "Not implemented" }),
   deleteFromCart: async () => ({ success: false, message: "Not implemented" }),
-  
+  fetchNotifications: async (_from?: number, _to?: number) => [],
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [productLoading, setProductLoading] = useState(false);
 
   // Verify JWT token
   const verifyToken = (token: string): DecodedToken | null => {
@@ -171,7 +171,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let query = supabase
       .from("products")
       .select("*")
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .in("type", ["Mobile", "Watch", "Dslr"])
+      .order("id", { ascending: false });
 
     if (brand) {
       query = query.in("brand", [brand]);
@@ -190,7 +192,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchProductDetail = async (id: number) => {
     const { data, error } = await supabase
       .from("products")
-      .select("*")
+      .select(`
+      *,
+      product_images:product_images (
+        id,
+        image_url,
+        product_id
+      )
+    `)
       .eq("id", id)
       .single();
 
@@ -314,6 +323,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchNotifications = async (from = 0, to = 20) => 
+  {
+    if (!user) return { success: false, message: "User not logged in" };
+
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("id", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      console.error("Error fetching notifications:", error.message);
+      return [];
+    }
+
+    return data;
+  };
+
+
   const deleteFromCart = async (cartId: number) => {
     if (!user) return { success: false, message: "User not logged in" };
 
@@ -331,8 +360,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AuthContext.Provider value={{ user, loading, setUser, fetchProducts, fetchProductDetail , fetchCart, addToCart, addToCartQuantity, deleteFromCart}}>
+    <AuthContext.Provider value={{ user, loading, setUser, fetchProducts, fetchProductDetail , fetchCart, addToCart, addToCartQuantity, deleteFromCart, fetchNotifications}}>
       {children}
     </AuthContext.Provider>
   );
 };
+  

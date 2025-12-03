@@ -219,7 +219,6 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "ios" ? 60 : StatusBar.currentHeight,
   },
   header: {
-    height: 60,
     alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
@@ -227,6 +226,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 16,
+    paddingBottom:10,
   },
   headerTitle: {
     fontSize: 20,
@@ -246,9 +246,9 @@ const styles = StyleSheet.create({
   cartRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    marginBottom: 10,
+    // borderBottomWidth: 1,
+    // borderBottomColor: "#eee",
     paddingBottom: 12,
   },
   productImage: {

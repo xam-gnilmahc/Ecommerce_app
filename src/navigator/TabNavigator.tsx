@@ -5,8 +5,9 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { COLORS } from '../theme/theme';
 import {BlurView} from '@react-native-community/blur';
 
-import HomeScreen from '../screens/Home';
+import NotificationScreen from '../screens/Notification';
 import CartScreen from '../screens/Cart';
+import HomeScreen from '../screens/Home';
 
 const Tab = createBottomTabNavigator();
 
@@ -77,7 +78,7 @@ const TabNavigator = () => {
 
       <Tab.Screen
         name="History"
-        component={HomeScreen}
+        component={NotificationScreen}
         options={{
           tabBarIcon: ({ focused }) => (
             <Ionicons
