@@ -34,21 +34,13 @@ const Home = () => {
   const ITEMS_PER_PAGE = 20;
 
   const loadProducts = async (pageToLoad, reset = false) => {
-    if (reset) {
-      setProductLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
+    reset ? setProductLoading(true) : setLoadingMore(true);
     const from = pageToLoad * ITEMS_PER_PAGE;
     const to = from + ITEMS_PER_PAGE - 1;
 
     try {
       const data = await fetchProducts(selectedBrand, from, to);
-      if (reset) {
-        setProducts(data || []);
-      } else {
-        setProducts((prev) => [...prev, ...(data || [])]);
-      }
+      setProducts(reset ? (data || []) : (prev => [...prev, ...(data || [])]));
     } catch (error) {
       console.error("Error fetching products:", error);
     } finally {
@@ -169,8 +161,8 @@ const Home = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {flex: 1,backgroundColor: COLORS.primaryWhiteHex},
-  headerContainer: {backgroundColor: "#fff",paddingHorizontal: SPACING.space_12,paddingTop: Platform.OS === "ios" ? 60 : StatusBar.currentHeight,paddingBottom: SPACING.space_10,borderBottomColor: "#f0f0f0",borderBottomWidth: 1,
+  container: {flex: 1,backgroundColor: COLORS.primaryWhiteHex,paddingHorizontal: SPACING.space_12,paddingTop: Platform.OS === "ios" ? 60 : StatusBar.currentHeight},
+  headerContainer: {backgroundColor: "#fff",paddingBottom: SPACING.space_10,borderBottomColor: "#f0f0f0",borderBottomWidth: 1,
   },
   searchRow: {
     flexDirection: "row",

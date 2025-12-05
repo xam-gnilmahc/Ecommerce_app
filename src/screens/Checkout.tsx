@@ -11,13 +11,16 @@ import {
   StyleSheet,
   StatusBar,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useForm, Controller } from "react-hook-form";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { CardField, useStripe } from "@stripe/stripe-react-native";
+import { CardField, useStripe, usePlatformPay } from "@stripe/stripe-react-native";
 import { ResponseNotificationContext } from "../context/ResponseNotificationContext";
 import { RouteProp } from "@react-navigation/native";
 import { useNavigation } from "@react-navigation/native";
+import { useLocation } from "../hook/useLocation";
+import setting from "../config/setting";
 
 const { width } = Dimensions.get("screen");
 
@@ -53,8 +56,9 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
   const navigation = useNavigation();
 
   const { showResponse } = useContext(ResponseNotificationContext);
+  const { location, loading: locationLoading, error: locationError, getCurrentLocation } = useLocation();
 
-  const { control, handleSubmit, watch } = useForm({
+  const { control, handleSubmit, watch, setValue } = useForm({
     defaultValues: {
       email: "",
       name: "",
@@ -65,12 +69,12 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
   });
 
   const [shippingMethod, setShippingMethod] = useState("free");
-  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [paymentMethod, setPaymentMethod] = useState("cod");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [showAllItems, setShowAllItems] = useState(false);
 
-  const [showMoreInfo, setShowMoreInfo] = useState(false);
+  const { isPlatformPaySupported } = usePlatformPay();
+  const [platformPayEnabled, setPlatformPayEnabled] = useState(false);
 
   const deliveryFields = [
     { name: "email", placeholder: "Email" },
@@ -80,7 +84,47 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
     { name: "zip", placeholder: "Zip Code" },
   ];
 
-  const shownFields = showMoreInfo ? deliveryFields : deliveryFields.slice(0, 5);
+  // Handle location when it's successfully fetched
+  React.useEffect(() => {
+    if (location && !locationLoading) {
+      setValue('address1', location.address);
+      setValue('zip', location.zipCode);
+      
+      if (location.city && location.state) {
+        setValue('address2', `${location.city}, ${location.state}`);
+      }
+      
+      // showResponse('Address auto-filled from your current location!', 'success');
+    }
+  }, [location, locationLoading]);
+
+  // Handle location errors - use a ref to prevent infinite loops
+  const errorShownRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (locationError && !errorShownRef.current) {
+      errorShownRef.current = true;
+      showResponse(locationError, 'error');
+      
+      // Reset after 2 seconds
+      setTimeout(() => {
+        errorShownRef.current = false;
+      }, 2000);
+    }
+  }, [locationError]);
+
+  const handleGetLocation = async () => {
+    try {
+      const result = await getCurrentLocation();
+      if (!result) {
+        // Location failed, offer manual option
+        showResponse('Location service unavailable. Please enter address manually.', 'error');
+      }
+    } catch (error) {
+      console.error('Location handler error:', error);
+      showResponse('Location service error', 'error');
+    }
+  };
 
   const subtotal = cart.reduce(
     (sum, item) =>
@@ -88,6 +132,7 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
     0
   );
   const shipping = shippingMethod === "free" ? 0 : 30;
+  const total = subtotal + shipping;
 
   const getImageUrl = (banner_url?: string) =>
     banner_url
@@ -126,28 +171,176 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
     return true;
   };
 
-  const handlePayment = async (data: any) => {
+  // Check if Google Pay is supported
+  React.useEffect(() => {
+    const checkPlatformPaySupport = async () => {
+      try {
+        const supported = await isPlatformPaySupported({ 
+          googlePay: { testEnv: true }
+        });
+        setPlatformPayEnabled(supported);
+      } catch (error) {
+        console.log("Google Pay not supported:", error);
+        setPlatformPayEnabled(false);
+      }
+    };
+
+    checkPlatformPaySupport();
+  }, []);
+
+  const handleGooglePay = async () => {
     if (!validateFields()) return;
     setLoading(true);
-    try {
-      if (paymentMethod === "card") {
-        const result = await stripe.createToken({ type: "Card" });
 
-        if (result.error) {
-          showResponse(result.error.message, "error");
-          setLoading(false);
+    try {
+      // Convert amount to cents (Stripe requires integer amount in smallest currency unit)
+      const amountInCents = Math.round(total * 100);
+
+      // Create payment method directly - this will show the Google Pay sheet
+      const { paymentMethod, error } = await stripe.createPlatformPayPaymentMethod({
+        googlePay: {
+          testEnv: true,
+          merchantCountryCode: 'US',
+          currencyCode: 'USD',
+          amount: amountInCents,
+        },
+      });
+
+      if (error) {
+        showResponse(error.message, "error");
+      } else if (paymentMethod) {
+        // Success! You get the payment method token here
+
+        const response = await sendPaymentToServer(paymentMethod.id, "paymentMethodId");
+
+        if(response == true){
+          showResponse("Google Pay payment successful!", "success");
           return;
         }
-        //console.log("✔ Token Created:", result.token?.id);
-        showResponse("Payment successful!", "success");
-      } else {
-        showResponse("Cash on Delivery is currently not available. Please use Card.", "error");
+        showResponse("Payment Failed", "error");
       }
     } catch (err: any) {
       const message = typeof err === "string" ? err : err?.message || "Payment failed";
       showResponse(message, "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCardPayment = async (data: any) => {
+    if (!validateFields()) return;
+    setLoading(true);
+    
+    try {
+      const result = await stripe.createToken({ type: "Card" });
+
+      if (result.error) {
+        showResponse(result.error.message, "error");
+        setLoading(false);
+        return;
+      }
+
+      // Success! You get the card token here
+      const token = result.token?.id;
+      if (token) {
+        const response = await sendPaymentToServer(token, "token");
+        if(response == true){
+          showResponse("Card payment successful!", "success");
+          return;
+        }
+        showResponse("Payment Failed", "error");
+      }
+      
+    } catch (err: any) {
+      const message = typeof err === "string" ? err : err?.message || "Payment failed";
+      showResponse(message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCashOnDelivery = async (data: any) => {
+    if (!validateFields()) return;
+    setLoading(true);
+
+    try {
+      // Simulate processing delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      showResponse("Order placed successfully! Pay when your items arrive.", "success");
+      
+    } catch (err: any) {
+      const message = typeof err === "string" ? err : err?.message || "Order failed";
+      showResponse(message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendPaymentToServer = async (id: string, type: "token" | "paymentMethodId") => {
+      const totalAmount = Math.round(subtotal + shipping);
+
+      const address = {
+        addressLine1: deliveryValues.addressLine1,
+        addressLine2: deliveryValues.addressLine2,
+        country: "US",
+        state: deliveryValues.state,
+        zipCode: deliveryValues.zip,
+      };
+
+      const paymentData = {
+        [type]: id, // dynamically send token or paymentMethodId
+        amount: totalAmount,
+        name: deliveryValues.name,
+        email: deliveryValues.email,
+        address,
+        comment: "Payment for order",
+      };
+
+      try {
+        const response = await fetch(
+          "https://fzliiwigydluhgbuvnmr.supabase.co/functions/v1/smart-handler",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${setting.SUPABASE_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(paymentData),
+          }
+        );      
+
+        const result = await response.json();
+        
+        return result.message === "Payment successful";
+      } catch (err: any) {
+        console.log("server error:", err);
+        return false;
+      }
+    };
+
+  const handlePayment = async (data: any) => {
+    if (paymentMethod === "googlepay") {
+      await handleGooglePay();
+    } else if (paymentMethod === "card") {
+      await handleCardPayment(data);
+    } else if (paymentMethod === "cod") {
+      await handleCashOnDelivery(data);
+    }
+  };
+
+  const getSubmitButtonText = () => {
+    if (loading) return "Processing...";
+    
+    switch (paymentMethod) {
+      case "googlepay":
+        return "Pay with Google Pay";
+      case "card":
+        return "Pay with Card";
+      case "cod":
+        return "Place Order (Cash on Delivery)";
+      default:
+        return "Submit Payment";
     }
   };
 
@@ -167,24 +360,36 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 80 }}
       >
+        <View style={styles.deliveryContainer}>
         <Text style={styles.sectionTitle}>Delivery Information</Text>
+        <View style={styles.locationButtonsContainer}>          
+              <TouchableOpacity 
+                style={[
+                  styles.locationButton,
+                  locationLoading && styles.locationButtonDisabled
+                ]}
+                onPress={handleGetLocation}
+                disabled={locationLoading}
+              >
+                {locationLoading ? (
+                  <ActivityIndicator size="small" color="#3B82F6" />
+                ) : (
+                  <Ionicons name="location" size={16} color="#3B82F6" />
+                )}
+              </TouchableOpacity>
+            </View>
+        </View>
 
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            justifyContent: "space-between",
-          }}
-        >
-          {shownFields.map((item, index) => (
-            <View key={index} style={{ width: "48%", marginBottom: 12 }}>
+        <View style={styles.fieldsContainer}>
+          {deliveryFields.map((item, index) => (
+            <View key={index} style={styles.fieldWrapper}>
               <Controller
                 control={control}
                 name={item.name}
                 render={({ field: { value, onChange } }) => (
                   <TextInput
                     placeholder={item.placeholder}
-                    style={styles.inputTwo}
+                    style={styles.input}
                     placeholderTextColor="#888"
                     value={value}
                     onChangeText={onChange}
@@ -197,7 +402,7 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
 
         {/* SHIPPING */}
         <Text style={styles.sectionTitle}>Shipping Method</Text>
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+        <View style={styles.shippingContainer}>
           <TouchableOpacity
             style={[
               styles.shipOption,
@@ -223,8 +428,10 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
           </TouchableOpacity>
         </View>
 
-        {/* PAYMENT */}
+        {/* PAYMENT METHODS */}
         <Text style={styles.sectionTitle}>Payment Method</Text>
+        
+        {/* Cash on Delivery */}
         <View style={styles.paymentRow}>
           <TouchableOpacity
             style={styles.paymentOption}
@@ -237,7 +444,10 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
             />
             <Text style={styles.payLabel}>Cash on Delivery</Text>
           </TouchableOpacity>
+        </View>
 
+        {/* Card Payment */}
+        <View style={styles.paymentRow}>
           <TouchableOpacity
             style={styles.paymentOption}
             onPress={() => setPaymentMethod("card")}
@@ -247,23 +457,48 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
               size={18}
               color="#000"
             />
-            <Text style={styles.payLabel}>Card</Text>
+            <Text style={styles.payLabel}>Credit/Debit Card</Text>
           </TouchableOpacity>
         </View>
 
         {paymentMethod === "card" && (
-          <>
-            <View style={styles.cardBox}>
-              <CardField
-                postalCodeEnabled={false}
-                placeholders={{ number: "4242 4242 4242 4242" }}
-                cardStyle={{ backgroundColor: "#ffffff", textColor: "#000000" }}
-                style={styles.cardField}
-              />
-            </View>
-
-          </>
+          <View style={styles.cardBox}>
+            <CardField
+              postalCodeEnabled={false}
+              placeholders={{ number: "4242 4242 4242 4242" }}
+              cardStyle={{ backgroundColor: "#ffffff", textColor: "#000000" }}
+              style={styles.cardField}
+            />
+          </View>
         )}
+
+        {/* Google Pay */}
+        {platformPayEnabled && (
+          <View style={styles.paymentRow}>
+            <TouchableOpacity
+              style={styles.paymentOption}
+              onPress={() => setPaymentMethod("googlepay")}
+            >
+              <Ionicons
+                name={paymentMethod === "googlepay" ? "radio-button-on" : "radio-button-off"}
+                size={20}
+                color="#111"
+              />
+              <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 10 }}>
+                <Ionicons name="logo-google" size={20} color="#EA4335" />
+                <Text style={styles.payLabel}>  Google Pay</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {paymentMethod === "googlepay" && (
+          <View style={styles.gpayBox}>
+            <Ionicons name="logo-google" size={22} color="#EA4335" />
+            <Text style={styles.gpayText}>Fast & secure Google Pay checkout</Text>
+          </View>
+        )}
+
         {/* ORDER SUMMARY */}
         <Text style={styles.sectionTitle}>Order Summary</Text>
         <View style={styles.summaryBox}>
@@ -273,21 +508,12 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
                 source={{ uri: getImageUrl(item.products?.banner_url) }}
                 style={styles.cartImage}
               />
-              <View style={{ flex: 1, marginLeft: 10 }}>
+              <View style={styles.cartItemDetails}>
                 <Text style={styles.cartName}>{item.products?.name ?? "Product"}</Text>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    marginTop: 6,
-                  }}
-                >
+                <View style={styles.cartItemRow}>
                   <Text style={styles.cartQty}>Qty: {item.quantity}</Text>
                   <Text style={styles.cartPrice}>
-                    Rs
-                    {(
-                      (item.amount ?? item.products?.amount ?? 0) * item.quantity
-                    ).toFixed(2)}
+                    ${((item.amount ?? item.products?.amount ?? 0) * item.quantity).toFixed(2)}
                   </Text>
                 </View>
               </View>
@@ -295,70 +521,49 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
           ))}
 
           {cart.length > 3 && !showAllItems && (
-            <TouchableOpacity
-              onPress={() => setShowAllItems(true)}
-              style={{ marginTop: 8 }}
-            >
-              <Text style={{ color: "#000", fontWeight: "600" }}>+ More</Text>
+            <TouchableOpacity onPress={() => setShowAllItems(true)} style={styles.moreButton}>
+              <Text style={styles.moreText}>+ More</Text>
             </TouchableOpacity>
           )}
 
           {showAllItems && cart.length > 3 && (
-            <TouchableOpacity
-              onPress={() => setShowAllItems(false)}
-              style={{ marginTop: 8 }}
-            >
-              <Text style={{ color: "#000", fontWeight: "600" }}>Less</Text>
+            <TouchableOpacity onPress={() => setShowAllItems(false)} style={styles.moreButton}>
+              <Text style={styles.moreText}>Less</Text>
             </TouchableOpacity>
           )}
 
           <View style={styles.sumRow}>
             <Text style={styles.sumText}>Subtotal</Text>
-            <Text style={styles.sumText}>Rs{subtotal.toFixed(2)}</Text>
+            <Text style={styles.sumText}>${subtotal.toFixed(2)}</Text>
           </View>
 
           <View style={styles.sumRow}>
             <Text style={styles.sumText}>Shipping</Text>
-            <Text style={styles.sumText}>Rs{shipping}</Text>
+            <Text style={styles.sumText}>${shipping}</Text>
           </View>
 
           <View style={styles.sumRow}>
             <Text style={styles.sumTotal}>Total</Text>
-            <Text style={styles.sumTotal}>
-              Rs{(subtotal + shipping).toFixed(2)}
-            </Text>
+            <Text style={styles.sumTotal}>${(subtotal + shipping).toFixed(2)}</Text>
           </View>
         </View>
       </ScrollView>
 
-      {/* SUBMIT */}
+      {/* PAYMENT BUTTON */}
       <View style={styles.fixedBottom}>
         <TouchableOpacity
-          style={styles.submitBtn}
+          style={[
+            styles.submitBtn,
+            loading && styles.submitBtnDisabled
+          ]}
           onPress={handleSubmit(handlePayment)}
           disabled={loading}
         >
           <Text style={styles.submitText}>
-            {loading ? "Processing..." : "Submit Payment"}
+            {getSubmitButtonText()}
           </Text>
         </TouchableOpacity>
       </View>
-
-      {/* SUCCESS MODAL */}
-      {/* <Modal visible={success} transparent animationType="fade">
-        <View style={styles.modalWrap}>
-          <View style={styles.modalBox}>
-            <Ionicons name="checkmark-circle" size={60} color="#00aa00" />
-            <Text style={styles.modalText}>Order Placed Successfully</Text>
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={() => setSuccess(false)}
-            >
-              <Text style={styles.closeText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal> */}
     </View>
   );
 };
@@ -368,131 +573,290 @@ export default Checkout;
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#F9FAFB",
     paddingTop: Platform.OS === "ios" ? 60 : StatusBar.currentHeight,
   },
+  deliveryContainer: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  /* HEADER */
   header: {
     height: 60,
     alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    backgroundColor: "#fff",
-    flexDirection: "row",
     justifyContent: "center",
-    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    backgroundColor: "#fff",
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#000",
+    color: "#111827",
   },
-
+locationButtonsContainer: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  locationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+    justifyContent: 'center',
+  },
+  locationButtonDisabled: {
+    opacity: 0.6,
+  },
+  locationButtonText: {
+    color: '#3B82F6',
+    fontWeight: '600',
+    marginLeft: 6,
+    fontSize: 14,
+  },
+  /* TITLES */
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    marginVertical: 12,
-    color: "#000",
+    fontWeight: "700",
+    marginVertical: 14,
+    color: "#111827",
   },
 
-  inputTwo: {
-    padding: 14,
-    borderRadius: 10,
-    backgroundColor: "#f1f1f1",
-    fontSize: 15,
-    color: "#000",
+  /* INPUTS */
+  fieldsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
   },
-
-  shipOption: {
+  gpayBox: {
+  flexDirection: "row",
+  alignItems: "center",
+  padding: 14,
+  borderRadius: 12,
+  backgroundColor: "#FFF8F6",
+  borderWidth: 1,
+  borderColor: "#FEE2E2",
+  marginTop: 8,
+},
+gpayText: {
+  fontSize: 15,
+  marginLeft: 10,
+  color: "#B91C1C",
+  fontWeight: "600",
+},
+  fieldWrapper: {
+    width: "48%",
+    marginBottom: 14,
+  },
+  input: {
     padding: 14,
     borderRadius: 12,
-    backgroundColor: "#f5f5f5",
-    flex: 1,
+    backgroundColor: "#FFFFFF",
+    fontSize: 15,
+    color: "#111827",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
-  shipSelected: { backgroundColor: "#dcdcdc" },
 
-  shipTitle: { fontSize: 16, fontWeight: "600", color: "#000" },
-  shipCost: { fontSize: 16, fontWeight: "700", color: "#000" },
-  shipSub: { color: "#888" },
+  /* SHIPPING */
+  shippingContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 12,
+  },
+  shipOption: {
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  shipSelected: {
+    borderColor: "#3B82F6",
+    backgroundColor: "#EFF6FF",
+  },
+  shipTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  shipCost: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 4,
+    color: "#111827",
+  },
+  shipSub: {
+    marginTop: 4,
+    color: "#6B7280",
+    fontSize: 13,
+  },
 
-  paymentRow: { flexDirection: "row", marginTop: 12, marginBottom: 10 },
+  /* PAYMENT */
+  paymentRow: {
+    marginVertical: 6,
+  },
   paymentOption: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: 20,
+    paddingVertical: 6,
   },
-  payLabel: { fontSize: 15, marginLeft: 6, color: "#000" },
+  payLabel: {
+    fontSize: 16,
+    marginLeft: 8,
+    color: "#111827",
+    fontWeight: "500",
+  },
 
   cardBox: {
-    padding: 10,
-    backgroundColor: "#f8f8f8",
-    borderRadius: 12,
+    padding: 14,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
     marginTop: 10,
   },
-  cardField: { height: 50 },
-
-  summaryBox: {
-    padding: 14,
-    backgroundColor: "#fafafa",
-    borderRadius: 12,
-    marginBottom: 20,
+  cardField: {
+    height: 50,
   },
+
+  platformPayInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: "#F0F9FF",
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+    marginTop: 8,
+  },
+  platformPayText: {
+    fontSize: 15,
+    marginLeft: 8,
+    color: "#0C4A6E",
+    fontWeight: "600",
+  },
+
+  /* ORDER SUMMARY BOX */
+  summaryBox: {
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginBottom: 25,
+  },
+
   cartItem: {
     flexDirection: "row",
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderColor: "#eee",
+    borderColor: "#E5E7EB",
+    alignItems: "center",
   },
-  cartImage: { width: 60, height: 60, borderRadius: 8, resizeMode: "contain" },
-  cartName: { fontSize: 15, fontWeight: "600", color: "#000" },
-  cartQty: { color: "#777" },
-  cartPrice: { color: "#000", fontWeight: "600" },
+  cartImage: {
+    width: 70,
+    height: 70,
+    resizeMode: "contain",
+  },
+  cartItemDetails: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  cartName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  cartItemRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  cartQty: {
+    color: "#6B7280",
+  },
+  cartPrice: {
+    color: "#111827",
+    fontWeight: "700",
+  },
 
+  moreButton: {
+    marginTop: 10,
+    alignItems: "center",
+  },
+  moreText: {
+    color: "#2563EB",
+    fontWeight: "700",
+  },
+
+  /* SUMMARY TOTALS */
   sumRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginVertical: 6,
+    marginTop: 10,
   },
-  sumText: { fontSize: 16, color: "#000" },
-  sumTotal: { fontSize: 18, fontWeight: "700", color: "#000" },
+  sumText: {
+    fontSize: 16,
+    color: "#374151",
+  },
+  sumTotal: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111827",
+    marginTop: 6,
+  },
 
+  /* TOKEN DISPLAY */
+  tokenContainer: {
+    padding: 14,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  tokenTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  tokenText: {
+    fontSize: 13,
+    color: "#6B7280",
+  },
+
+  /* SUBMIT BUTTON */
   fixedBottom: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 20,
-    backgroundColor: "#fff",
+    padding: 18,
+    backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#E5E7EB",
   },
   submitBtn: {
-    padding: 16,
+    backgroundColor: "#2563EB",
+    paddingVertical: 16,
     borderRadius: 12,
-    backgroundColor: "#000",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  submitText: { color: "#fff", fontSize: 17, fontWeight: "600" },
-
-  modalWrap: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
+  submitBtnDisabled: {
+    backgroundColor: "#93C5FD",
   },
-  modalBox: {
-    width: width * 0.8,
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 14,
-    alignItems: "center",
+  submitText: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
-  modalText: { marginTop: 12, fontSize: 18, fontWeight: "600", color: "#000" },
-  closeBtn: {
-    marginTop: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 30,
-    backgroundColor: "#000",
-    borderRadius: 8,
-  },
-  closeText: { color: "#fff", fontSize: 16 },
 });
