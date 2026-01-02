@@ -41,7 +41,7 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
-  fetchProducts: () => Promise<Product[]>;
+  fetchProducts: (selectedBrand?: string, from?: number, to?: number ) => Promise<Product[]>;
   fetchProductDetail: (id: number) => Promise<any>;
   fetchCart: () => Promise<any>;
   addToCart: (productId: number) => Promise<{ success: boolean; message: string }>;
