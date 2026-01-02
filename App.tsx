@@ -18,7 +18,7 @@ const App = () => {
   }, []);
 
   return (
-    <StripeProvider publishableKey="pk_test_51PGec42K0njal9PzJzzxwBOVszXOkqMCBcovRYFChW727EsjLGJ9sWMvztGAGnnmVAtquHDgSllxMryuvfgnv87D00nc9a1Yp7">
+    <StripeProvider publishableKey="">
     <AuthProvider>
       <ResponseNotificationProvider>
         <AppNavigator />
