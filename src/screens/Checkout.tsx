@@ -21,6 +21,7 @@ import { RouteProp } from "@react-navigation/native";
 import { useNavigation } from "@react-navigation/native";
 import { useLocation } from "../hook/useLocation";
 import setting from "../config/setting";
+import { AuthContext } from "../context/AuthContext";
 
 const { width } = Dimensions.get("screen");
 
@@ -56,6 +57,7 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
   const navigation = useNavigation();
 
   const { showResponse } = useContext(ResponseNotificationContext);
+  const { placeOrder } = useContext(AuthContext);
   const { location, loading: locationLoading, error: locationError, getCurrentLocation } = useLocation();
 
   const { control, handleSubmit, watch, setValue } = useForm({
@@ -68,7 +70,7 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
     },
   });
 
-  const [shippingMethod, setShippingMethod] = useState("free");
+  const [shippingMethod, setShippingMethod] = useState('free');
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [loading, setLoading] = useState(false);
   const [showAllItems, setShowAllItems] = useState(false);
@@ -263,12 +265,13 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
     if (!validateFields()) return;
     setLoading(true);
 
+
     try {
       // Simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      showResponse("Order placed successfully! Pay when your items arrive.", "success");
-      
+      // await new Promise(resolve => setTimeout(resolve, 1500));
+
+      showResponse("Cash on delivery not available at this moment.", "error");
+
     } catch (err: any) {
       const message = typeof err === "string" ? err : err?.message || "Order failed";
       showResponse(message, "error");
@@ -311,8 +314,23 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
         );      
 
         const result = await response.json();
-        
-        return result.message === "Payment successful";
+
+
+        if (result.message != "Payment successful") {
+          return false;;
+        }
+
+        const orderId = await placeOrder({ 
+          ...paymentData, 
+          payment_status: "success",
+          shipping_method: shippingMethod,
+        }, result);
+
+        if (orderId) {
+          return true;
+        }
+        console.log("Order placement failed after payment");
+        return false;
       } catch (err: any) {
         console.log("server error:", err);
         return false;

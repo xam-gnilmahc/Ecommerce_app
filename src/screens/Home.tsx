@@ -20,7 +20,7 @@ import { supabase } from "../utils/supbase";
 
 const { width } = Dimensions.get("window");
 
-const BRANDS = ["Apple", "Samsung", "Nothing", "Sony", "Huawei", "Google", "Redmi", "Vivo"];
+const BRANDS = ["Apple", "Samsung", "Google", "Nothing", "Huawei", "Sony", "Redmi", "Vivo"];
 
 const Home = () => {
   const { fetchProducts } = useContext(AuthContext);
