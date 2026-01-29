@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .eq('email', decoded.email)
       .single();
 
-    if (selectError && selectError.code !== 'PGRST116') console.error('Error fetching user:', selectError);
+    if (selectError && selectError.code !== 'PGRST116') return setUser(null);
 
     const finalUser =
       existingUser ??
@@ -88,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .select()
         .single()
         .then(res => {
-          if (res.error) console.error('Error inserting user:', res.error);
+          if (res.error) return null;
           return res.data;
       }));
 
@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (brand) query = query.in('brand', [brand]);
 
     const { data, error } = await query.range(from, to);
-    if (error) console.error("Error fetching products:", error.message), [];
+    if (error) return [];
     return data ?? [];
   };
 
@@ -141,7 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .range(from, to)
       .order('id', { ascending: true });
 
-    if (error) return console.error('Error searching products:', error.message), [];
+    if (error) return [];
 
     return data ?? [];
   };
@@ -182,7 +182,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       `)
       .eq('user_id', user.id)
       .order('id', { ascending: false });
-    if (error) console.error("Error fetching cart:", error.message), [];
+    if (error) return [];
     return data ?? [];
   };
 
@@ -262,7 +262,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .eq('user_id', user.id)
       .order('id', { ascending: false })
       .range(from, to);
-    if (error) console.error("Error fetching notifications:", error.message);
+    if (error) return [];
     return data ?? [];
   };
 
@@ -339,7 +339,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await removeFromCartAfterOrder();
       return newOrder.id;
     } catch (err: any) {
-      console.error("Error placing order:", err.message);
       throw err;
     }
   };
