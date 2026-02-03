@@ -24,7 +24,7 @@ const BRANDS = ["Apple", "Samsung", "Google", "Nothing", "Huawei", "Sony", "Redm
 
 const Home = () => {
   const { fetchProducts } = useContext(AuthContext);
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [productLoading, setProductLoading] = useState(true);
   const [selectedBrand, setSelectedBrand] = useState("Apple");
   const [page, setPage] = useState(0);
@@ -33,7 +33,7 @@ const Home = () => {
 
   const ITEMS_PER_PAGE = 20;
 
-  const loadProducts = async (pageToLoad, reset = false) => {
+  const loadProducts = async (pageToLoad:any, reset = false) => {
     reset ? setProductLoading(true) : setLoadingMore(true);
     const from = pageToLoad * ITEMS_PER_PAGE;
     const to = from + ITEMS_PER_PAGE - 1;
