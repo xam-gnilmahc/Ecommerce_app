@@ -207,7 +207,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   productList: {
-    paddingHorizontal: SPACING.space_10,
     paddingTop: SPACING.space_8,
     paddingBottom: SPACING.space_20,
   },
@@ -230,7 +229,7 @@ const styles = StyleSheet.create({
   backgroundColor: "#fff",
   borderRadius: 12,
   marginBottom: 16,
-  padding: 12,
+  paddingTop: SPACING.space_8,
 },
 skeletonImage: {
   width: "100%",

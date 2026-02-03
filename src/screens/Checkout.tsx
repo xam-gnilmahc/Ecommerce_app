@@ -217,6 +217,7 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
 
         if(response == true){
           showResponse("Google Pay payment successful!", "success");
+          navigation.goBack();
           return;
         }
         showResponse("Payment Failed", "error");
@@ -248,6 +249,7 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
         const response = await sendPaymentToServer(token, "token");
         if(response == true){
           showResponse("Card payment successful!", "success");
+            navigation.goBack();
           return;
         }
         showResponse("Payment Failed", "error");
@@ -323,7 +325,7 @@ const Checkout: React.FC<CheckoutProps> = ({ route }) => {
         const orderId = await placeOrder({ 
           ...paymentData, 
           payment_status: "success",
-          shipping_method: shippingMethod,
+          shipping_method: shipping,
         }, result);
 
         if (orderId) {

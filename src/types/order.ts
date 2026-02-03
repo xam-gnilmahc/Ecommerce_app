@@ -11,7 +11,7 @@ export type OrderData = {
   address: Address;
   amount: number;
   payment_status: string;
-  shipping_method?: string;
+  shipping_method?: any;
 };
 
 export type StripeData = {
